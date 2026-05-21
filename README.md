@@ -51,7 +51,8 @@ git --version
 > **Screenshot 1:** Take a screenshot of your terminal showing both
 > successful version checks and insert it here.
 >
-> `[insert screenshot]`
+> <img width="937" height="146" alt="image" src="https://github.com/user-attachments/assets/4ded3f4b-c2c2-48d3-b282-0f32b8f2a719" />
+
 
 ---
 
@@ -71,6 +72,7 @@ ls
 
 > You should see only the `README.md`. You will create all further files
 > yourself during this exercise.
+><img width="1038" height="352" alt="image" src="https://github.com/user-attachments/assets/a8061dee-01be-4f37-96d9-747cc0d6c8c3" />
 
 ---
 
@@ -133,19 +135,22 @@ for each temporal attribute.
 example — using arithmetic — of why `REAL` would produce an incorrect result
 for a lending fee calculation. Which type must be used instead?
 
-> *Your answer:*
+> If we use REAL, the database uses floating-point math, which isn't perfectly accurate for decimals.
+> With NUMERIC, the database treats it as exact money, preventing rounding errors.
 
 **Question 1.2:** `rueckgabe_datum` must be nullable. Explain what `NULL` means
 in this specific context. Is `NULL` the same as "zero days"? Justify with
 reference to the three-valued logic of SQL.
 
-> *Your answer:*
+> NULL means the book hasn't been returned yet.
+> It is not "zero." In SQL's 3-valued logic, comparing NULL to 0 results in "Unknown," not True or False.
 
 **Question 1.3:** `beitritt_datum` should default to today's date when no value
 is provided. Write the `DEFAULT` expression you would use and explain why this
 is preferable to always supplying the date explicitly in the application.
 
-> *Your answer:*
+> DEFAULT CURRENT_DATE. It's safer to let the database handle it automatically.
+> This guarantees the join date is always recorded, even if the application code forgets to send it.
 
 ---
 
@@ -242,7 +247,8 @@ sqlite3 bibliothek.db ".schema"
 > **Screenshot 2:** Take a screenshot showing the `.tables` and `.schema`
 > output in your terminal.
 >
-> `[insert screenshot]`
+> <img width="897" height="777" alt="image" src="https://github.com/user-attachments/assets/6fbb851e-80a5-43ef-95f8-722001e78fb8" />
+
 
 ### Task 2c – Test Constraints
 
@@ -268,9 +274,9 @@ INSERT INTO ausleihe VALUES (1, 1, 1, '2026-05-10', '2026-05-01');
 
 > *Describe the error or result for each test:*
 >
-> - Test A:
-> - Test B:
-> - Test C:
+> - Test A: error because the daily fee provided (-1.50) is negative.
+> - Test B: error because the insert statement is missing an email address.
+> - Test C: error because the return date (May 1, 2026) is earlier than the loan date (May 10, 2026).
 
 ### Questions for Task 2
 
@@ -278,19 +284,22 @@ INSERT INTO ausleihe VALUES (1, 1, 1, '2026-05-10', '2026-05-01');
 constraint rather than a column constraint. Why is a column constraint
 insufficient here?
 
-> *Your answer:*
+> A column constraint only checks its own column.
+> We need a table constraint because we are comparing two different columns (return date vs. loan date).
 
 **Question 2.2:** You chose `ON DELETE RESTRICT` for all foreign keys.
 Describe a realistic alternative: for which relationship would `ON DELETE
 CASCADE` be appropriate instead, and why?
 
-> *Your answer:*
+>ON DELETE CASCADE is perfect for buch and exemplar.
+>If a book is permanently removed from the catalog, the database should automatically delete all of its physical copies too.
 
 **Question 2.3:** `email` is declared `UNIQUE`. According to the SQL standard,
 how many `NULL` values may a `UNIQUE` column contain? Explain using the
 three-valued logic of SQL.
 
-> *Your answer:*
+> Unlimited. NULL means "unknown." Because the database evaluates NULL = NULL as "Unknown" instead of True,
+> it does not treat them as duplicates.
 
 ---
 
