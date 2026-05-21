@@ -395,6 +395,7 @@ BEGIN;
 SELECT * FROM buch;  -- verify
 ROLLBACK;            -- change to COMMIT after verification
 ```
+<img width="1037" height="50" alt="image" src="https://github.com/user-attachments/assets/98698553-a6fe-4b6a-83ba-3279d4ecf51e" />
 
 ### Task 3c – DELETE Statements
 
@@ -417,21 +418,24 @@ works because all affected rows are in the same table. Why can a standard SQL
 `UPDATE` not update rows in two different tables simultaneously, and what would
 you use instead in a production system?
 
-> *Your answer:*
+> Standard SQL only locks and updates one table at a time for safety.
+> In production, use multiple UPDATEs wrapped in a single BEGIN / COMMIT transaction block.
 
 **Question 3.2:** Task 3b.3 raises the fee for books published before 1960
 by 10 cents. Write the equivalent statement using `NUMERIC` arithmetic:
 `tagesgebuehr = tagesgebuehr + 0.10`. Would the same statement work correctly
 with `REAL`? Explain the risk.
 
-> *Your answer:*
+> Your answer: Standard SQL only locks and updates one table at a time for safety.
+> In production, use multiple UPDATEs wrapped in a single BEGIN / COMMIT transaction block.
 
 **Question 3.3:** Task 3c.1 deletes loans where the return date is more than
 30 days ago. A `DELETE` without a `WHERE` clause would delete all loans.
 Describe the operational consequence and explain how `BEGIN` / `ROLLBACK`
 protects against this mistake.
 
-> *Your answer:*
+> It deletes every row in the table. BEGIN / ROLLBACK creates a temporary safe zone,
+> allowing you to undo the mistake before saving it permanently.
 
 ---
 
@@ -492,14 +496,16 @@ ALTER TABLE exemplar
 nullable column. Why is this simpler than adding a `NOT NULL` column to an
 already-populated table? What steps would be needed for a `NOT NULL` column?
 
-> *Your answer:*
+> It is simpler because the database just fills existing rows with NULL.
+> If we add a NOT NULL column, we must either provide a DEFAULT value or use the 4-step table rebuild method to avoid breaking existing rows.
 
 **Question 4.2:** SQLite's limited `ALTER TABLE` support is a deliberate
 design decision. What does this tell you about the trade-off between a
 lightweight embedded database and a full-featured server database system?
 Name one scenario where SQLite is the right choice and one where it is not.
 
-> *Your answer:*
+> We see a trade-off where SQLite sacrifices complex features for extreme simplicity and speed.
+> SQLite is perfect for mobile apps or local testing, but we should not use it for large, high-concurrency web servers.
 
 Commit:
 
@@ -553,7 +559,8 @@ SELECT * FROM ausleihe WHERE ausleihe_id = 5;
 
 > **Screenshot 3:** Take a screenshot showing the inserted row.
 >
-> `[insert screenshot]`
+> <img width="1077" height="137" alt="image" src="https://github.com/user-attachments/assets/45f510d3-e60b-46c2-9599-2ab4609910f3" />
+
 
 ### Task 5b – Simulate a Rollback
 
@@ -579,6 +586,10 @@ SELECT COUNT(*) FROM ausleihe WHERE ausleihe_id = 6;
 ```
 
 > *Describe what you see and explain why `ROLLBACK` reversed both changes:*
+> 
+>In the output, the first query shows the actual return date instead of NULL, and the second query returns 0, meaning the new loan doesn't exist.
+> This happens because calling ROLLBACK cancels the entire transaction. Since we put both the UPDATE and the INSERT inside the same BEGIN block,
+> the database treats them as a single, all-or-nothing package. When the rollback was triggered, it instantly threw out both changes and reverted the database back to exactly how it was before.
 
 ### Questions for Task 5
 
@@ -586,20 +597,24 @@ SELECT COUNT(*) FROM ausleihe WHERE ausleihe_id = 6;
 availability check and the insert happen inside the same transaction?
 What could go wrong if they ran as separate Autocommit statements?
 
-> *Your answer:*
+> If we ran them separately, two people could check the database at the exact same millisecond, see the book is available,
+> and both borrow it! Putting them in one transaction locks it down so the second step has to finish before anyone else can touch it
 
 **Question 5.2:** The lecture states: "Ein fehlendes `WHERE` aktualisiert
 alle Zeilen." Write the single most dangerous `UPDATE` statement possible
 on this database and explain the damage it would cause. Then explain how
 `BEGIN` / `ROLLBACK` would allow you to recover.
 
-> *Your answer:*
+> This would instantly wipe out the daily fee for every single book in the library.
+> If we put BEGIN; before running it, we can just type ROLLBACK;
+> to safely undo the mistake before it saves permanently.
 
 **Question 5.3:** Autocommit is convenient for read-only queries (`SELECT`).
 Is it also safe for DML in an interactive session? Give a concrete example
 from this exercise where Autocommit would have caused irreversible data loss.
 
-> *Your answer:*
+> No it’s really risky for making changes! For example when we deleted the old loans earlier if we had Autocommit on and accidentally forgot the WHERE clause.
+> We would have instantly deleted every single loan in the database with no way to get them back.
 
 Commit:
 
@@ -618,7 +633,8 @@ The lecture warns against using `TEXT` for everything. Looking at the
 it should be a more specific type, and what concrete query would break or
 produce wrong results if the wrong type were used?
 
-> *Your answer:*
+> erscheinungsjahr (publication year). If we stored it as TEXT, range queries like WHERE erscheinungsjahr < 1960 (which we used in Task 3b) would give completely
+> wrong results because the database would sort the numbers alphabetically instead of numerically
 
 **Question B – DDL as documentation:**  
 A colleague reads your `schema.sql` and says: "Constraints slow down inserts
@@ -626,14 +642,16 @@ A colleague reads your `schema.sql` and says: "Constraints slow down inserts
 reasons why enforcing constraints in the database is preferable to
 enforcing them only in application code.
 
-> *Your answer:*
+> First if we access the database directly via the terminal (like we did today!), application rules can't protect the data.
+> Second, if multiple apps connect to the same database, putting the rules in the database ensures they are always enforced without having to rewrite the same checks in every app's code.
 
 **Question C – NULL semantics in lending:**  
 In `ausleihe`, `rueckgabe_datum IS NULL` means "currently on loan". Could
 this semantic be expressed without using `NULL` — e.g. by using a status
 column instead? What are the trade-offs?
 
-> *Your answer:*
+> Yes we could add a status column (e.g., 'active' or 'returned'). The trade-off is that it creates redundancy and risks data inconsistency (like a row saying 'returned' but having no return date).
+> Using NULL smartly combines both the "status" and the missing "date" into one clean column.
 
 **Question D – `TRUNCATE` vs. `DELETE`:**  
 If you wanted to reset the entire database and reload the sample data from
@@ -641,13 +659,15 @@ scratch, you would need to empty all four tables. Can you use `TRUNCATE`
 in SQLite? What alternative would you use, and in what order must the tables
 be emptied to respect foreign key constraints?
 
-> *Your answer:*
+> No, SQLite does not support the TRUNCATE command. Instead, we have to use DELETE FROM table_name;
+> To avoid foreign key errors, we must empty the child tables first, then the parents: ausleihe first, then exemplar, and finally buch and mitglied.
 
 > **Screenshot 4:** Take a screenshot showing the output of the row-count
 > verification from Task 3a after completing all DML tasks, with
 > `.headers on` and `.mode column` active.
 >
-> `[insert screenshot]`
+> <img width="690" height="308" alt="image" src="https://github.com/user-attachments/assets/a4658b00-58de-44dd-96bc-4f5c8affe23f" />
+
 
 ---
 
